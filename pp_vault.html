@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Braintree Client</title>
+</head>
+
+<body>
+
+    <div id="paypal-button"></div>
+    <br>
+    <div id="braintree-nonce"></div>
+    <br>
+
+    <script src="https://www.paypalobjects.com/api/checkout.js" data-version-4 log-level="warn"></script>
+    <script src="https://js.braintreegateway.com/web/3.56.0/js/client.min.js"></script>
+    <script src="https://js.braintreegateway.com/web/3.56.0/js/paypal-checkout.min.js"></script>
+
+    <script>
+
+        const CLIENT_AUTHORIZATION = 'sandbox_w3wwvnk5_ghdpqzz8yrjq72d8';
+        const SERVER_CHECKOUT = 'http://localhost:3000/checkout';
+        // const SERVER_CHECKOUT = 'https://braintree-receiver.free.beeceptor.com';
+
+        var braintreeNonce = document.getElementById("braintree-nonce");
+
+        braintree.client.create({
+            authorization: CLIENT_AUTHORIZATION
+        }).then(function (clientInstance) {
+            return braintree.paypalCheckout.create({
+                client: clientInstance
+            });
+        }).then(function (paypalCheckoutInstance) {
+            return paypal.Button.render({
+                env: 'sandbox', 
+
+                payment: function () {
+                    return paypalCheckoutInstance.createPayment({
+                        flow: 'vault',
+                        billingAgreementDescription: 'Your agreement description',
+                        enableShippingAddress: true,
+                        shippingAddressEditable: false,
+                        shippingAddressOverride: {
+                            recipientName: 'Scruff McGruff',
+                            line1: '1234 Main St.',
+                            line2: 'Unit 1',
+                            city: 'Chicago',
+                            countryCode: 'US',
+                            postalCode: '60652',
+                            state: 'IL',
+                            phone: '123.456.7890'
+                        }
+                    });
+                },
+
+                onAuthorize: function (data, actions) {
+                    return paypalCheckoutInstance.tokenizePayment(data)
+                        .then(function (payload) {
+                            braintreeNonce.innerHTML = payload.nonce;
+                            var payButton = document.createElement("button");
+                            payButton.innerHTML = "Pay";
+                            document.body.appendChild(payButton);
+                            payButton.addEventListener('click', function() {
+                                handleBraintree();
+                            })
+
+                        });
+                },
+
+                onCancel: function (data) {
+                    console.log('checkout.js payment cancelled', JSON.stringify(data, 0, 2));
+                },
+
+                onError: function (err) {
+                    console.error('checkout.js error', err);
+                }
+            }, '#paypal-button');
+        }).then(function () {
+        }).catch(function (err) {
+            // Handle component creation error
+        });
+
+        function handleBraintree() {
+            // console.log("click recebido");
+            fetch(SERVER_CHECKOUT, { 
+                method: 'POST',
+                body: JSON.stringify({ nonce: braintreeNonce.innerText }),
+                headers: { "Content-Type": "application/json" }
+            })
+            .then(function (data) {  
+                console.log('Request success: ', data);  
+            })  
+            .catch(function (error) {  
+                console.log('Request failure: ', error);  
+            });
+        }
+
+    </script>
+
+</body>
+
+</html>

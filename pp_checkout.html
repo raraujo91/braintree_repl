@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>Braintree Client</title>
+</head>
+<body>
+
+    <div id="paypal-button"></div>
+    
+    <script src="https://www.paypalobjects.com/api/checkout.js" data-version-4 log-level="warn"></script>
+    <script src="https://js.braintreegateway.com/web/3.56.0/js/client.min.js"></script>
+    <script src="https://js.braintreegateway.com/web/3.56.0/js/paypal-checkout.min.js"></script>
+    <script src="./config.js"></script>
+
+    <script>
+
+    const CLIENT_AUTHORIZATION = 'sandbox_w3wwvnk5_ghdpqzz8yrjq72d8';
+    const SERVER_CHECKOUT = 'http://localhost:3000/checkout';
+
+    braintree.client.create({ authorization: CLIENT_AUTHORIZATION }, function (clientErr, clientInstance) {
+
+        if (clientErr) {
+            console.error('Error creating client:', clientErr);
+            return;
+        }
+
+        braintree.paypalCheckout.create({ client: clientInstance }, function (paypalErr, paypalInstance) {
+
+                if (paypalErr) {
+                    console.error('Error creating PayPal Checkout:', paypalErr);
+                    return;
+                }
+
+                paypal.Button.render({
+                    env: 'sandbox', 
+                    commit: true,
+
+                    payment: function () {
+                        return paypalInstance.createPayment({
+                            flow: 'checkout',
+                            amount: config.amount,
+                            currency: config.currency
+                        });
+                    },
+
+                    onAuthorize: function (data, actions) {
+                        return paypalInstance.tokenizePayment(data, function (err, payload) {
+                        // Submit `payload.nonce` to your server.
+                        fetch(SERVER_CHECKOUT, { 
+                            method: 'POST',
+                            body: JSON.stringify({ 
+                                nonce: payload.nonce, 
+                                amount: config.amount 
+                            }),
+                            headers: { "Content-Type": "application/json" }
+                        })
+                        .then(function (data) {  
+                            console.log('Request success: ', data);  
+                        })  
+                        .catch(function (error) {  
+                            console.log('Request failure: ', error);  
+                        });
+                        });
+                    },
+
+                    onCancel: function (data) {
+                        console.log('checkout.js payment cancelled', JSON.stringify(data, 0, 2));
+                    },
+
+                    onError: function (err) {
+                        console.error('checkout.js error', err);
+                    }
+                }, '#paypal-button').then(function () {
+
+                });
+
+            });
+
+        }
+    );
+    </script>
+
+</body>
+</html>

@@ -4,32 +4,65 @@
 <head>
     <meta charset="utf-8">
     <script src="https://js.braintreegateway.com/web/dropin/1.21.0/js/dropin.min.js"></script>
+    <script src="./config.js"></script>
 </head>
 
 <body>
+    <div id="purchase-value"></div>
+    <br>   
     <div id="dropin-container"></div>
-    <button id="submit-button">Request payment method</button>
+    <button id="submit-button">Executar o pagamento</button>
     <script>
+
+        var purchaseExibit = document.querySelector('#purchase-value');
+
+        purchaseExibit.innerHTML = `R$ ${config.amount}` 
+
         var button = document.querySelector('#submit-button');
 
         const TOKEN_URL = 'http://localhost:3000/client_token';
+        const SERVER_CHECKOUT = 'http://localhost:3000/checkout';
 
         fetch(TOKEN_URL, { method: 'GET' })
-                .then(function (response) {
-                    return response.text();
-                }).then(function (data) {
-                    console.log(data);
-                    braintree.dropin.create({
-                        authorization: data,
-                        container: '#dropin-container'
-                    }, function (createErr, instance) {
-                        button.addEventListener('click', function () {
-                            instance.requestPaymentMethod(function (err, payload) {
-                                // Submit payload.nonce to your server
-                            });
+            .then(function (response) {
+                return response.text();
+            }).then(function (data) {
+                // console.log(data);
+                braintree.dropin.create({
+                    authorization: data,
+                    container: '#dropin-container',
+                    locale: 'pt_BR',
+                    card: {
+                        cardholderName: {
+                            required: true
+                        }
+                    },
+                    paypal: {
+                        flow: 'checkout',
+                        amount: config.amount,
+                        currency: config.currency
+                    }
+                }, function (createErr, instance) {
+                    button.addEventListener('click', function () {
+                        instance.requestPaymentMethod(function (err, payload) {
+                            fetch(SERVER_CHECKOUT, {
+                                method: 'POST',
+                                body: JSON.stringify({ 
+                                    nonce: payload.nonce,
+                                    amount: config.amount
+                                 }),
+                                headers: { "Content-Type": "application/json" }
+                            })
+                                .then(function (data) {
+                                    console.log('Request success: ', data);
+                                })
+                                .catch(function (error) {
+                                    console.log('Request failure: ', error);
+                                });
                         });
                     });
                 });
+            });
     </script>
 </body>
 
